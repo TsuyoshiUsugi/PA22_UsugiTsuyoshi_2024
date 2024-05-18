@@ -19,23 +19,47 @@ constexpr int BALLDUR = 5;
 
 void Main()
 {
-title:
-#pragma region タイトル
-	Scene::SetBackground(ColorF{ 0.8, 0.9, 1.0 });
-	Font font(60);
+#pragma region ゲームオーバー
+
+
 	while (System::Update())
 	{
-		font(U"ブロック崩し").drawAt(Scene::Center(), Palette::Skyblue);
-
-		if (SimpleGUI::ButtonAt(U"スタート", TITLE_POS + Vec2{ 0, 100 }))
-		{
-			break;
-		}
+		
 	}
 #pragma endregion
+}
 
-#pragma region インゲーム
-	Vec2 ballVelocity{ 0, -BALLSPEED };
+class State
+{
+	public:
+		virtual void update() = 0;
+		virtual void Start() = 0;
+};
+
+class Title : public State
+{
+	Font font{ 60 };
+	void start() {
+		Scene::SetBackground(ColorF{ 0.8, 0.9, 1.0 });
+	}
+	void update() {
+		while (System::Update())
+		{
+			font(U"ブロック崩し").drawAt(Scene::Center(), Palette::Skyblue);
+			if (SimpleGUI::ButtonAt(U"スタート", TITLE_POS + Vec2{ 0, 100 }))
+			{
+				break;
+			}
+		}
+	}
+};
+
+class Game : public State
+{
+	
+	void update()
+	{
+		Vec2 ballVelocity{ 0, -BALLSPEED };
 	Circle ball{ 400, 400, 8 };
 	Rect bricks[MAX];
 	int Score = 0;
@@ -47,20 +71,9 @@ title:
 			bricks[index] = Rect{ x * (BRICKSIZE.x + BALLDUR), y * (BRICKSIZE.y + BALLDUR), BRICKSIZE };
 		}
 	}
-
-	while (System::Update())
-	{
-#pragma region 更新
-		const Rect paddle{ Arg::center(Cursor::Pos().x, 500), 60, 10 };
+		auto paddleX = Clamp(Cursor::Pos().x, 30, 770);
+		const Rect paddle{ Arg::center(paddleX, 500), 60, 10 };
 		ball.moveBy(ballVelocity * Scene::DeltaTime());
-
-#pragma endregion
-#pragma region 物理
-
-
-		/*if (ball.intersects(paddle)) {
-			ballVelocity.y = -BALLSPEED;
-		}*/
 
 		for (int i = 0; i < MAX; ++i) {
 			auto& refBrick = bricks[i];
@@ -104,10 +117,6 @@ title:
 			isGameOver = true;
 			break;
 		}
-
-
-#pragma endregion
-#pragma region 描画
 		for (size_t i = 0; i < MAX; i++)
 		{
 			bricks[i].stretched(1).draw(HSV(bricks[i].y - 40));
@@ -117,28 +126,24 @@ title:
 		ball.draw();
 
 		font(U"Score:", Score).drawAt(Scene::Center().movedBy(0, 200));
-#pragma endregion
 	}
-#pragma endregion
+	}
+};
 
-#pragma region ゲームオーバー
-
-
-	while (System::Update())
-	{
+class GameOver : public State
+{
+	void update() {
 		font(U"Game Over").drawAt(Scene::Center(), Palette::Black);
 
 		if (SimpleGUI::ButtonAt(U"リトライ", TITLE_POS + Vec2{ 0, 100 }))
 		{
 			isGameOver = false;
-			goto title;
+			goto title;	// タイトルに戻る(一番上)
 		}
 	}
-#pragma endregion
+};
 
-}
-
-class State
+class GameClear : public State
 {
 	void update() {}
 };
