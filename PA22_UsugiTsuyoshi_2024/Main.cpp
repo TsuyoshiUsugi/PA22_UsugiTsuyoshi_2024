@@ -3,18 +3,18 @@
 //titleの定数
 constexpr Size TITLE_SIZE = { 800, 600 };
 constexpr Vec2 TITLE_POS = { 400, 300 };
-
 //インゲームの定数
 constexpr int RADIUS = 40;
 constexpr float BALLSPEED = 500.0f;
 constexpr Vec2 BALLSIZE = { 40, 20 };
 constexpr Vec2 BLOCKSIZE = { 40, 20 };
-
 constexpr int XCOUNT = 20;
 constexpr int YCOUNT = 5;
 constexpr int MAX = XCOUNT * YCOUNT;
 constexpr Size BRICKSIZE = { 40, 20 };
 constexpr int BALLDUR = 5;
+//インゲームのスコア
+int SCORE = 0;
 
 class State
 {
@@ -31,7 +31,7 @@ class Title : public State
 public:
 	void start(State& nextState) override
 	{
-		gameState = &nextState;
+		SCORE = 0;
 		Scene::SetBackground(ColorF{ 0.8, 0.9, 1.0 });
 	}
 	void update() override;
@@ -63,9 +63,7 @@ public:
 	{
 		Vec2 ballVelocity{ 0, -BALLSPEED };
 		Circle ball{ 400, 400, 8 };
-		Rect bricks[MAX];
-		int score = 0;
-		bool isGameOver = false;
+		Rect bricks[MAX]{};
 		for (int y = 0; y < YCOUNT; ++y) {
 			for (int x = 0; x < XCOUNT; ++x) {
 				int index = y * XCOUNT + x;
@@ -78,11 +76,12 @@ public:
 			const Rect paddle{ Arg::center(paddleX, 500), 60, 10 };
 			ball.moveBy(ballVelocity * Scene::DeltaTime());
 
-			for (int i = 0; i < MAX; ++i) {
+			for (int i = 0; i < MAX; ++i)
+			{
 				auto& refBrick = bricks[i];
 
-				if (refBrick.intersects(ball)) {
-
+				if (refBrick.intersects(ball))
+				{
 					// ブロックの上辺、または底辺と交差
 					if (refBrick.bottom().intersects(ball) || refBrick.top().intersects(ball))
 					{
@@ -93,7 +92,7 @@ public:
 						ballVelocity.x *= -1;
 					}
 					refBrick.y -= 600;
-					score += 1;
+					SCORE += 1;
 					break;
 				}
 			}
@@ -115,10 +114,8 @@ public:
 				}.setLength(BALLSPEED);
 			}
 
-			if (ball.y > 600)
+			if (ball.y > 600 || SCORE == MAX)
 			{
-				isGameOver = true;
-				//gameState->start(*gameState);
 				break;
 			}
 			for (size_t i = 0; i < MAX; i++)
@@ -129,7 +126,7 @@ public:
 			paddle.rounded(3).draw();
 			ball.draw();
 
-			font(U"Score:", score).drawAt(Scene::Center().movedBy(0, 200));
+			font(U"Score:", SCORE).drawAt(Scene::Center() - Vec2{0, 1}.movedBy(0, 200));
 
 		}
 
@@ -151,10 +148,10 @@ public:
 	{
 		while (System::Update())
 		{
-			font(U"Game Over").drawAt(Scene::Center(), Palette::Black);
+			font(U"Game Over").drawAt(Scene::Center() - Vec2{ 0, 100 }, Palette::Black);
+			font(U"スコア: " + Format(SCORE)).drawAt(Scene::Center(), Palette::Black);
 			if (SimpleGUI::ButtonAt(U"リトライ", TITLE_POS + Vec2{ 0, 100 }))
 			{
-				//gameState->start(*gameState);
 				break;
 			}
 		}
