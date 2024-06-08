@@ -16,134 +16,176 @@ constexpr int MAX = XCOUNT * YCOUNT;
 constexpr Size BRICKSIZE = { 40, 20 };
 constexpr int BALLDUR = 5;
 
-
-void Main()
-{
-#pragma region ゲームオーバー
-
-
-	while (System::Update())
-	{
-		
-	}
-#pragma endregion
-}
-
 class State
 {
-	public:
-		virtual void update() = 0;
-		virtual void Start() = 0;
+public:
+	virtual void update() = 0;
+	virtual void start(State& nextState) = 0;
 };
 
 class Title : public State
 {
 	Font font{ 60 };
-	void start() {
+	State* gameState = nullptr;
+
+public:
+	void start(State& nextState) override
+	{
+		gameState = &nextState;
 		Scene::SetBackground(ColorF{ 0.8, 0.9, 1.0 });
 	}
-	void update() {
-		while (System::Update())
+	void update() override;
+};
+
+void Title::update()
+{
+	while (System::Update())
+	{
+		font(U"ブロック崩し").drawAt(Scene::Center(), Palette::Skyblue);
+		if (SimpleGUI::ButtonAt(U"スタート", TITLE_POS + Vec2{ 0, 100 }))
 		{
-			font(U"ブロック崩し").drawAt(Scene::Center(), Palette::Skyblue);
-			if (SimpleGUI::ButtonAt(U"スタート", TITLE_POS + Vec2{ 0, 100 }))
-			{
-				break;
-			}
+			break;
 		}
 	}
-};
+}
 
 class Game : public State
 {
-	
-	void update()
+	Font font{ 60 };
+	State* gameState = nullptr;
+
+public:
+	void start(State& nextState) override
+	{
+		gameState = &nextState;
+	}
+	void update() override
 	{
 		Vec2 ballVelocity{ 0, -BALLSPEED };
-	Circle ball{ 400, 400, 8 };
-	Rect bricks[MAX];
-	int Score = 0;
-	bool isGameOver = false;
-
-	for (int y = 0; y < YCOUNT; ++y) {
-		for (int x = 0; x < XCOUNT; ++x) {
-			int index = y * XCOUNT + x;
-			bricks[index] = Rect{ x * (BRICKSIZE.x + BALLDUR), y * (BRICKSIZE.y + BALLDUR), BRICKSIZE };
-		}
-	}
-		auto paddleX = Clamp(Cursor::Pos().x, 30, 770);
-		const Rect paddle{ Arg::center(paddleX, 500), 60, 10 };
-		ball.moveBy(ballVelocity * Scene::DeltaTime());
-
-		for (int i = 0; i < MAX; ++i) {
-			auto& refBrick = bricks[i];
-
-			if (refBrick.intersects(ball)) {
-
-				// ブロックの上辺、または底辺と交差
-				if (refBrick.bottom().intersects(ball) || refBrick.top().intersects(ball))
-				{
-					ballVelocity.y *= -1;
-				}
-				else
-				{
-					ballVelocity.x *= -1;
-				}
-				refBrick.y -= 600;
-				Score += 1;
-				break;
+		Circle ball{ 400, 400, 8 };
+		Rect bricks[MAX];
+		int score = 0;
+		bool isGameOver = false;
+		for (int y = 0; y < YCOUNT; ++y) {
+			for (int x = 0; x < XCOUNT; ++x) {
+				int index = y * XCOUNT + x;
+				bricks[index] = Rect{ x * (BRICKSIZE.x + BALLDUR), y * (BRICKSIZE.y + BALLDUR), BRICKSIZE };
 			}
 		}
-
-		// 天井との衝突を検知
-		if ((ball.y < 0) && (ballVelocity.y < 0))
+		while (System::Update())
 		{
-			ballVelocity.y *= -1;
+			auto paddleX = Clamp(Cursor::Pos().x, 30, 770);
+			const Rect paddle{ Arg::center(paddleX, 500), 60, 10 };
+			ball.moveBy(ballVelocity * Scene::DeltaTime());
+
+			for (int i = 0; i < MAX; ++i) {
+				auto& refBrick = bricks[i];
+
+				if (refBrick.intersects(ball)) {
+
+					// ブロックの上辺、または底辺と交差
+					if (refBrick.bottom().intersects(ball) || refBrick.top().intersects(ball))
+					{
+						ballVelocity.y *= -1;
+					}
+					else
+					{
+						ballVelocity.x *= -1;
+					}
+					refBrick.y -= 600;
+					score += 1;
+					break;
+				}
+			}
+
+			// 天井との衝突を検知
+			if ((ball.y < 0) && (ballVelocity.y < 0))
+			{
+				ballVelocity.y *= -1;
+			}
+
+			if (((ball.x < 0) && (ballVelocity.x < 0)) || ((Scene::Width() < ball.x) && (0 < ballVelocity.x)))
+			{
+				ballVelocity.x *= -1;
+			}
+
+			if ((0 < ballVelocity.y) && paddle.intersects(ball))
+			{
+				ballVelocity = Vec2{ (ball.x - paddle.center().x) * 10,-ballVelocity.y
+				}.setLength(BALLSPEED);
+			}
+
+			if (ball.y > 600)
+			{
+				isGameOver = true;
+				//gameState->start(*gameState);
+				break;
+			}
+			for (size_t i = 0; i < MAX; i++)
+			{
+				bricks[i].stretched(1).draw(HSV(bricks[i].y - 40));
+			}
+
+			paddle.rounded(3).draw();
+			ball.draw();
+
+			font(U"Score:", score).drawAt(Scene::Center().movedBy(0, 200));
+
 		}
 
-		if (((ball.x < 0) && (ballVelocity.x < 0)) || ((Scene::Width() < ball.x) && (0 < ballVelocity.x)))
-		{
-			ballVelocity.x *= -1;
-		}
-
-		if ((0 < ballVelocity.y) && paddle.intersects(ball))
-		{
-			ballVelocity = Vec2{ (ball.x - paddle.center().x) * 10,-ballVelocity.y
-			}.setLength(BALLSPEED);
-		}
-
-		if (ball.y > 600)
-		{
-			isGameOver = true;
-			break;
-		}
-		for (size_t i = 0; i < MAX; i++)
-		{
-			bricks[i].stretched(1).draw(HSV(bricks[i].y - 40));
-		}
-
-		paddle.rounded(3).draw();
-		ball.draw();
-
-		font(U"Score:", Score).drawAt(Scene::Center().movedBy(0, 200));
-	}
 	}
 };
 
 class GameOver : public State
 {
-	void update() {
-		font(U"Game Over").drawAt(Scene::Center(), Palette::Black);
+	Font font{ 60 };
+	State* gameState = nullptr;
 
-		if (SimpleGUI::ButtonAt(U"リトライ", TITLE_POS + Vec2{ 0, 100 }))
+public:
+	void start(State& nextState) override
+	{
+		gameState = &nextState;
+		Scene::SetBackground(ColorF{ 0.8, 0.9, 1.0 });
+	}
+	void update() override
+	{
+		while (System::Update())
 		{
-			isGameOver = false;
-			goto title;	// タイトルに戻る(一番上)
+			font(U"Game Over").drawAt(Scene::Center(), Palette::Black);
+			if (SimpleGUI::ButtonAt(U"リトライ", TITLE_POS + Vec2{ 0, 100 }))
+			{
+				//gameState->start(*gameState);
+				break;
+			}
 		}
 	}
 };
 
 class GameClear : public State
 {
-	void update() {}
+	void start(State& nextState) override
+	{
+	}
+	void update() override
+	{
+	}
 };
+
+void Main()
+{
+	Title title;
+	Game game;
+	GameOver gameover;
+
+	while (System::Update())
+	{
+		title.start(game);
+		title.update();
+		game.start(gameover);
+		game.update();
+		gameover.start(title);
+		gameover.update();
+	}
+}
+
+
